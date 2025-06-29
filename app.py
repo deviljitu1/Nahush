@@ -39,17 +39,32 @@ class AIGenerator:
         if not industry:
             industry = "technology and digital marketing"
 
-        prompt = f"""Create a compelling LinkedIn post about {topic} in the {industry} industry.
+        prompt = f"""Create a unique, engaging LinkedIn post about: {topic}
+
+Context:
+- Industry: {industry}
+- Tone: {tone}
+- Topic: {topic}
 
 Requirements:
-- Tone: {tone}
-- Length: 2-4 sentences
-- Include emojis for engagement
-- Make it professional yet engaging
-- End with a question to encourage interaction
-- Include 3-5 relevant hashtags
+- Make the content SPECIFIC to "{topic}" - don't be generic
+- Length: 3-5 sentences (150-250 words)
+- Include relevant emojis for visual appeal
+- Make it professional yet conversational
+- End with an engaging question related to {topic}
+- Include 5-7 relevant hashtags specific to {topic}
+- Add value and insights about {topic}
+- Make it shareable and thought-provoking
+- Include a call-to-action
 
-Generate the post:"""
+Structure:
+1. Hook/Opening about {topic}
+2. Key insights or value about {topic}
+3. Personal perspective or industry context
+4. Engaging question for audience
+5. Relevant hashtags
+
+Generate a unique LinkedIn post:"""
 
         try:
             response = requests.post(
@@ -58,11 +73,11 @@ Generate the post:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": "You are a professional LinkedIn content creator. Create engaging, authentic posts that drive engagement and provide value to the audience."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry}. Create unique, specific, and engaging posts that provide real value to the audience. Each post should be different and tailored to the exact topic provided."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 300,
-                    "temperature": 0.7
+                    "max_tokens": 400,
+                    "temperature": 0.8
                 }
             )
             
@@ -84,21 +99,35 @@ Generate the post:"""
             # In production, you might want to use a more robust article extraction service
             article_content = self._extract_article_content(url)
             
-            prompt = f"""Create a compelling LinkedIn post summarizing this article: {url}
+            prompt = f"""Create a unique LinkedIn post summarizing this article: {url}
 
 Article content: {article_content[:1000]}...
 
-Requirements:
+Context:
+- Industry: {industry or 'general'}
 - Tone: {tone}
-- Industry context: {industry or 'general'}
-- Length: 2-4 sentences
-- Include emojis for engagement
-- Make it professional yet engaging
-- End with a question to encourage interaction
-- Include 3-5 relevant hashtags
-- Mention it's a summary of an article
+- Source: Article from {url}
 
-Generate the post:"""
+Requirements:
+- Create a UNIQUE summary specific to this article's content
+- Length: 3-5 sentences (150-250 words)
+- Include relevant emojis for visual appeal
+- Make it professional yet engaging
+- End with an engaging question related to the article
+- Include 5-7 relevant hashtags specific to the article topic
+- Add your perspective or insights about the article
+- Make it shareable and thought-provoking
+- Include a call-to-action
+- Mention it's based on an article but make it your own take
+
+Structure:
+1. Hook about the article's key insight
+2. Your take on the article's main points
+3. Why this matters to the audience
+4. Engaging question for discussion
+5. Relevant hashtags
+
+Generate a unique LinkedIn post:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -106,11 +135,11 @@ Generate the post:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": "You are a professional LinkedIn content creator. Create engaging, authentic posts that drive engagement and provide value to the audience."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Create unique, specific summaries that add value and perspective to articles. Each summary should be different and tailored to the specific article content."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 400,
-                    "temperature": 0.7
+                    "max_tokens": 500,
+                    "temperature": 0.8
                 }
             )
             
@@ -142,10 +171,18 @@ Generate the post:"""
 
     def _get_fallback_post(self, topic, industry, tone):
         """Fallback post if AI fails"""
+        # Create more specific fallback posts based on the actual topic
+        topic_clean = topic.replace('"', '').strip()
+        industry_clean = industry.replace('"', '').strip()
+        
         fallback_posts = [
-            f"🚀 Excited to share insights about {topic} in the {industry} space! The journey of continuous learning and growth never stops. What's your experience with this?\n\n#{industry.replace(' ', '')} #{topic.replace(' ', '')} #ProfessionalGrowth #Innovation",
-            f"💡 Just completed an amazing {topic} project! The {industry} industry is evolving rapidly, and staying ahead requires constant innovation. How do you stay updated?\n\n#{industry.replace(' ', '')} #{topic.replace(' ', '')} #ProfessionalGrowth #Innovation",
-            f"🎯 Another milestone achieved in {topic}! The {industry} landscape is full of opportunities for those willing to adapt and grow. What challenges are you facing?\n\n#{industry.replace(' ', '')} #{topic.replace(' ', '')} #ProfessionalGrowth #Innovation"
+            f"🚀 Excited to dive deep into {topic_clean}! The {industry_clean} landscape is evolving rapidly, and understanding {topic_clean} is crucial for staying ahead. What's your biggest challenge with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            
+            f"💡 Just explored the fascinating world of {topic_clean} in {industry_clean}! The insights I've gained are game-changing. How has {topic_clean} impacted your professional journey?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            
+            f"🎯 {topic_clean} is revolutionizing how we approach {industry_clean}! The opportunities are endless for those willing to adapt. What's your experience with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            
+            f"🔥 The future of {industry_clean} lies in mastering {topic_clean}! It's not just about keeping up—it's about leading the way. How are you leveraging {topic_clean} in your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
         ]
         return random.choice(fallback_posts)
 
