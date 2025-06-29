@@ -3,9 +3,10 @@ services:
     name: linkedin-ai-post-generator
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
+    startCommand: gunicorn app:app
     envVars:
+      - key: OPENROUTER_API_KEY
+        value: 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
       - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: OPEN_ROUTER
-        sync: false  # Set this in Render dashboard 
+        value: 3.9.16
+    healthCheckPath: /health 

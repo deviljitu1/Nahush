@@ -1,5 +1,5 @@
 // API Configuration - API calls will be made through the backend
-const API_URL = 'http://localhost:8000/api/generate-post';
+const API_URL = '/api/generate-post';
 
 // DOM Elements
 const postForm = document.getElementById('postForm');
