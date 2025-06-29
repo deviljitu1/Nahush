@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple HTTP server for LinkedIn AI Post Generator
+Simple HTTP server for LinkedIn AI Post Generator using Google Gemini API
 Run this script to serve the web interface locally
 """
 
@@ -19,14 +19,13 @@ from bs4 import BeautifulSoup
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get('PORT', 8000))  # Railway sets PORT environment variable
 HOST = os.environ.get('HOST', '0.0.0.0')  # Railway uses 0.0.0.0
-OPENROUTER_API_KEY = os.environ.get('OPEN_ROUTER')
-print(f"[DEBUG] OPEN_ROUTER from environment: {OPENROUTER_API_KEY}")
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCR2qkH4DXw4jBXbT94YnAOgwaSD6r-rBI')
 
 # Check if API key is set
-if not OPENROUTER_API_KEY:
-    print("⚠️  Warning: OPEN_ROUTER environment variable not set!")
-    print("Please set your OpenRouter API key as an environment variable:")
-    print("set OPEN_ROUTER=your-api-key-here")
+if not GEMINI_API_KEY:
+    print("⚠️  Warning: GEMINI_API_KEY environment variable not set!")
+    print("Please set your Gemini API key as an environment variable:")
+    print("set GEMINI_API_KEY=your-api-key-here")
     print("Or set it in Railway dashboard under Variables section")
     # Don't exit - let Railway handle it
 
@@ -61,8 +60,8 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             data = json.loads(post_data.decode('utf-8'))
             
             # Check if we have an API key
-            if not OPENROUTER_API_KEY:
-                self.send_error(500, "OpenRouter API key not configured")
+            if not GEMINI_API_KEY:
+                self.send_error(500, "Gemini API key not configured")
                 return
             
             # Generate post based on type
@@ -82,84 +81,61 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             print(f"Error generating post: {e}")
             self.send_error(500, str(e))
     
+    def call_gemini_api(self, prompt):
+        """Call Google Gemini API with the given prompt"""
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 400
+                }
+            }
+            
+            response = requests.post(url, json=payload)
+            
+            if response.status_code != 200:
+                print(f"Gemini API error: {response.text}")
+                raise Exception(f"Gemini API error: {response.status_code}")
+            
+            data = response.json()
+            
+            # Extract the generated text from Gemini response
+            if 'candidates' in data and len(data['candidates']) > 0:
+                return data['candidates'][0]['content']['parts'][0]['text'].strip()
+            else:
+                raise Exception("No response generated from Gemini API")
+                
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            raise e
+    
     def generate_post_from_topic(self, topic, industry, tone):
-        """Generate LinkedIn post from topic"""
+        """Generate LinkedIn post from topic using Gemini"""
         try:
             prompt = self.create_topic_prompt(topic, industry, tone)
-            headers = {
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://openrouter.ai/'
-            }
-            print(f"[DEBUG] (topic) Sending OpenRouter API key: {OPENROUTER_API_KEY}")
-            print(f"[DEBUG] (topic) Headers: {headers}")
-            response = requests.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                headers=headers,
-                json={
-                    'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
-                    'messages': [
-                        {
-                            'role': 'system',
-                            'content': 'You are a professional LinkedIn content creator. Create engaging posts that drive engagement and build professional relationships.'
-                        },
-                        {
-                            'role': 'user',
-                            'content': prompt
-                        }
-                    ],
-                    'max_tokens': 400,
-                    'temperature': 0.7
-                }
-            )
-            if response.status_code != 200:
-                raise Exception(f"OpenRouter API error: {response.text}")
-            data = response.json()
-            return data['choices'][0]['message']['content'].strip()
+            return self.call_gemini_api(prompt)
         except Exception as e:
             print(f"Error generating post from topic: {e}")
             raise e
     
     def generate_post_from_article(self, url, industry, tone):
-        """Generate LinkedIn post from article URL"""
+        """Generate LinkedIn post from article URL using Gemini"""
         try:
             # Extract article content
             article_data = self.extract_article_content(url)
             
             # Create prompt for article summarization
             prompt = self.create_article_prompt(article_data, industry, tone)
-            headers = {
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://openrouter.ai/'
-            }
-            print(f"[DEBUG] (article) Sending OpenRouter API key: {OPENROUTER_API_KEY}")
-            print(f"[DEBUG] (article) Headers: {headers}")
-            response = requests.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                headers=headers,
-                json={
-                    'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
-                    'messages': [
-                        {
-                            'role': 'system',
-                            'content': 'You are a professional LinkedIn content creator. Create engaging posts that summarize articles and drive engagement.'
-                        },
-                        {
-                            'role': 'user',
-                            'content': prompt
-                        }
-                    ],
-                    'max_tokens': 400,
-                    'temperature': 0.7
-                }
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"OpenRouter API error: {response.text}")
-            
-            data = response.json()
-            return data['choices'][0]['message']['content'].strip()
+            return self.call_gemini_api(prompt)
             
         except Exception as e:
             print(f"Error generating post from article: {e}")
@@ -285,7 +261,7 @@ def main():
     
     # Create server
     with socketserver.TCPServer((HOST, PORT), CustomHTTPRequestHandler) as httpd:
-        print(f"🚀 LinkedIn AI Post Generator Server")
+        print(f"🚀 LinkedIn AI Post Generator Server (Gemini)")
         print(f"📁 Serving files from: {DIRECTORY}")
         print(f"🌐 Server running at: http://{HOST}:{PORT}")
         
@@ -299,11 +275,11 @@ def main():
         
         print("-" * 50)
         
-        if OPENROUTER_API_KEY:
-            print("✅ OpenRouter API key configured")
+        if GEMINI_API_KEY:
+            print("✅ Gemini API key configured")
         else:
-            print("⚠️  OpenRouter API key not found in environment variables")
-            print("Set OPEN_ROUTER variable in Railway dashboard")
+            print("⚠️  Gemini API key not found in environment variables")
+            print("Set GEMINI_API_KEY variable in Railway dashboard")
         
         # Open browser automatically (only for local development)
         if not os.environ.get('RAILWAY_ENVIRONMENT'):
@@ -314,7 +290,7 @@ def main():
                 print("⚠️  Could not open browser automatically. Please open it manually.")
         
         print("\n🎯 Features:")
-        print("• Generate LinkedIn posts with AI")
+        print("• Generate LinkedIn posts with Google Gemini AI")
         print("• Article URL summarization")
         print("• Choose topic, industry, and tone")
         print("• Copy posts to clipboard")

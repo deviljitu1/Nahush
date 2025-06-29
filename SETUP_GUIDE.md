@@ -1,83 +1,115 @@
-# Setup Guide - LinkedIn AI Post Generator
+# LinkedIn AI Post Generator - Setup Guide (Google Gemini)
 
-## 🔑 Step 1: Get Your API Key
+## 🚨 Critical Issues Fixed
 
-1. **Go to OpenRouter.ai**
-   - Visit: https://openrouter.ai
-   - Click "Sign Up" or "Get Started"
+### 1. **API Key Configuration**
+The application now uses Google Gemini API. Here's how to set it up:
 
-2. **Create Account**
-   - Sign up with email or GitHub
-   - Verify your email
+#### Option A: Environment Variable (Recommended)
+```bash
+# Windows PowerShell
+$env:GEMINI_API_KEY="your-gemini-api-key-here"
 
-3. **Get Your API Key**
-   - Go to your dashboard
-   - Copy your API key (starts with `sk-or-v1-`)
-   - Keep it safe - you'll need it!
+# Windows Command Prompt
+set GEMINI_API_KEY=your-gemini-api-key-here
 
-## 🚀 Step 2: Start the Server
+# Linux/Mac
+export GEMINI_API_KEY="your-gemini-api-key-here"
+```
 
-### Option A: Automatic Setup (Recommended)
-1. **Double-click** `start_server.bat`
-2. **Enter your API key** when prompted
-3. **Wait for server to start**
-4. **Open browser** to `http://localhost:8000`
+#### Option B: Create a .env file
+Create a file named `.env` in the project root:
+```
+GEMINI_API_KEY=your-gemini-api-key-here
+```
 
-### Option B: Manual Setup
-1. **Open PowerShell** in this folder
-2. **Set your API key:**
+### 2. **Get Your Google Gemini API Key**
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the generated API key
+5. Use it in the setup above
+
+**Note:** Your Gemini API key is already configured in the server.py file as a default value.
+
+## 🛠️ Installation Steps
+
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Start the Server
+```bash
+python server.py
+```
+
+### 3. Access the Application
+Open your browser and go to: `http://localhost:8000`
+
+## 🔧 Troubleshooting
+
+### Issue: "Gemini API key not configured"
+**Solution**: The API key is already configured in the code, but you can set it as an environment variable if needed.
+
+### Issue: "Failed to fetch" error
+**Solution**: Make sure the Python server is running on port 8000.
+
+### Issue: "Rate limit exceeded"
+**Solution**: Wait a few minutes and try again. Google Gemini has rate limits on free accounts.
+
+### Issue: Article URL not working
+**Solution**: The CORS proxy might be down. Try a different article URL or use topic-based generation.
+
+## 📁 Project Structure
+
+```
+Nahush/
+├── index.html          # Main web interface
+├── style.css           # Styling
+├── script.js           # Frontend JavaScript
+├── server.py           # Python backend server (Gemini API)
+├── requirements.txt    # Python dependencies
+└── SETUP_GUIDE.md     # This file
+```
+
+## 🚀 Features
+
+- ✅ AI-powered LinkedIn post generation using Google Gemini
+- ✅ Article URL summarization
+- ✅ Customizable industry and tone
+- ✅ Mobile-responsive design
+- ✅ Copy to clipboard functionality
+- ✅ Direct LinkedIn integration
+
+## 🔒 Security Notes
+
+- API keys are handled securely through environment variables
+- No sensitive data is stored locally
+- CORS headers are properly configured for web requests
+
+## 📞 Support
+
+If you encounter any issues:
+1. Check that all dependencies are installed
+2. Verify your API key is correctly set (if using environment variable)
+3. Ensure the server is running on port 8000
+4. Check the browser console for error messages
+
+## 🎯 Quick Start
+
+1. **Open PowerShell** and navigate to your project:
    ```powershell
-   $env:OPEN_ROUTER = "your-actual-api-key-here"
+   cd "C:\Users\Nahush Patel\Desktop\Nahush"
    ```
-3. **Start the server:**
+
+2. **Start the server**:
    ```powershell
    python server.py
    ```
 
-## ✅ Step 3: Test It Works
+3. **Open your browser** to `http://localhost:8000`
 
-1. **Open browser** to `http://localhost:8000`
-2. **Enter a topic** like "web development project"
-3. **Choose industry** and **tone**
-4. **Click "Generate Post"**
-5. **You should see a LinkedIn post!**
+4. **Generate a post** by entering a topic or article URL!
 
-## 🔧 Troubleshooting
-
-### "No auth credentials found" Error
-- Make sure you entered your real API key
-- Check that it starts with `sk-or-v1-`
-- Try restarting the server
-
-### "Port already in use" Error
-- Close other applications using port 8000
-- Or restart your computer
-
-### "Python not found" Error
-- Install Python 3.7 or higher
-- Make sure Python is in your PATH
-
-## 📱 Using the App
-
-### Generate from Topic
-- Enter: "client success story"
-- Industry: Business
-- Tone: Professional
-- Click "Generate Post"
-
-### Generate from Article
-- Paste: `https://techcrunch.com/2024/01/15/ai-trends`
-- Industry: Technology
-- Tone: Educational
-- Click "Generate Post"
-
-## 🎯 Next Steps
-
-- **Copy posts** to clipboard
-- **Open LinkedIn** to post them
-- **Share with others** who need help
-- **Deploy to GitHub** for public access
-
----
-
-**Need help?** Check the main README.md or create an issue on GitHub. 
+The Gemini API key is already configured in the code, so it should work immediately! 

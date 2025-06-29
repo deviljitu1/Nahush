@@ -12,8 +12,8 @@ const errorText = document.getElementById('errorText');
 // Event Listeners
 postForm.addEventListener('submit', handleFormSubmit);
 
-// URL detection regex
-const URL_REGEX = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+// URL detection regex - improved to handle more URL formats
+const URL_REGEX = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?(\?[^\s]*)?$/;
 
 // Handle form submission
 async function handleFormSubmit(e) {
@@ -41,7 +41,19 @@ async function handleFormSubmit(e) {
         displayResult(post);
     } catch (error) {
         console.error('Error details:', error);
-        showError('Failed to generate post. Please make sure the Python server is running on port 8000.');
+        let errorMessage = 'Failed to generate post. ';
+        
+        if (error.message.includes('Failed to fetch')) {
+            errorMessage += 'Please make sure the Python server is running on port 8000.';
+        } else if (error.message.includes('Server error: 500')) {
+            errorMessage += 'Server error - please check if the OpenRouter API key is configured.';
+        } else if (error.message.includes('Server error: 429')) {
+            errorMessage += 'Rate limit exceeded. Please try again in a few minutes.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showError(errorMessage);
     } finally {
         hideLoading();
     }
