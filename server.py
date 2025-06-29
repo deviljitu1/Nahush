@@ -20,6 +20,7 @@ DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get('PORT', 8000))  # Railway sets PORT environment variable
 HOST = os.environ.get('HOST', '0.0.0.0')  # Railway uses 0.0.0.0
 OPENROUTER_API_KEY = os.environ.get('OPEN_ROUTER')
+print(f"[DEBUG] OPEN_ROUTER from environment: {OPENROUTER_API_KEY}")
 
 # Check if API key is set
 if not OPENROUTER_API_KEY:
@@ -85,14 +86,16 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         """Generate LinkedIn post from topic"""
         try:
             prompt = self.create_topic_prompt(topic, industry, tone)
-            
+            headers = {
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://openrouter.ai/'
+            }
+            print(f"[DEBUG] (topic) Sending OpenRouter API key: {OPENROUTER_API_KEY}")
+            print(f"[DEBUG] (topic) Headers: {headers}")
             response = requests.post(
                 'https://openrouter.ai/api/v1/chat/completions',
-                headers={
-                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://openrouter.ai/'
-                },
+                headers=headers,
                 json={
                     'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
                     'messages': [
@@ -109,13 +112,10 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     'temperature': 0.7
                 }
             )
-            
             if response.status_code != 200:
                 raise Exception(f"OpenRouter API error: {response.text}")
-            
             data = response.json()
             return data['choices'][0]['message']['content'].strip()
-            
         except Exception as e:
             print(f"Error generating post from topic: {e}")
             raise e
@@ -128,14 +128,16 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             # Create prompt for article summarization
             prompt = self.create_article_prompt(article_data, industry, tone)
-            
+            headers = {
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://openrouter.ai/'
+            }
+            print(f"[DEBUG] (article) Sending OpenRouter API key: {OPENROUTER_API_KEY}")
+            print(f"[DEBUG] (article) Headers: {headers}")
             response = requests.post(
                 'https://openrouter.ai/api/v1/chat/completions',
-                headers={
-                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://openrouter.ai/'
-                },
+                headers=headers,
                 json={
                     'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
                     'messages': [

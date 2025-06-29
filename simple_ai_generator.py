@@ -43,6 +43,7 @@ Requirements:
 Generate the post:"""
 
         try:
+            print(f"[DEBUG] Authorization header: Bearer {OPENROUTER_API_KEY}")
             response = requests.post(
                 self.base_url,
                 headers=self.headers,
@@ -84,7 +85,7 @@ def main():
     print()
     
     # Your OpenRouter API key
-    api_key = "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"
+    api_key = "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"
     
     generator = SimpleAIGenerator(api_key)
     
