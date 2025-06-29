@@ -22,6 +22,7 @@ async function handleFormSubmit(e) {
     const topic = document.getElementById('topic').value.trim();
     const industry = document.getElementById('industry').value;
     const tone = document.getElementById('tone').value;
+    const wordCount = document.getElementById('wordCount').value;
     
     // Show loading spinner
     showLoading();
@@ -33,9 +34,9 @@ async function handleFormSubmit(e) {
         
         // Check if topic is a URL
         if (isValidURL(topic)) {
-            post = await generateLinkedInPostFromArticle(topic, industry, tone);
+            post = await generateLinkedInPostFromArticle(topic, industry, tone, wordCount);
         } else {
-            post = await generateLinkedInPost(topic, industry, tone);
+            post = await generateLinkedInPost(topic, industry, tone, wordCount);
         }
         
         displayResult(post);
@@ -122,7 +123,7 @@ async function extractArticleContent(url) {
 }
 
 // Generate LinkedIn post from article URL using backend API
-async function generateLinkedInPostFromArticle(url, industry, tone) {
+async function generateLinkedInPostFromArticle(url, industry, tone, wordCount) {
     console.log('Making article API call to:', API_URL);
     
     const response = await fetch(API_URL, {
@@ -134,7 +135,8 @@ async function generateLinkedInPostFromArticle(url, industry, tone) {
             type: 'article',
             url: url,
             industry: industry,
-            tone: tone
+            tone: tone,
+            wordCount: wordCount
         })
     });
     
@@ -152,7 +154,7 @@ async function generateLinkedInPostFromArticle(url, industry, tone) {
 }
 
 // Generate LinkedIn post using backend API
-async function generateLinkedInPost(topic, industry, tone) {
+async function generateLinkedInPost(topic, industry, tone, wordCount) {
     console.log('Making API call to:', API_URL);
     
     const response = await fetch(API_URL, {
@@ -164,7 +166,8 @@ async function generateLinkedInPost(topic, industry, tone) {
             type: 'topic',
             topic: topic,
             industry: industry,
-            tone: tone
+            tone: tone,
+            wordCount: wordCount
         })
     });
     

@@ -21,7 +21,7 @@ class AIGenerator:
             "HTTP-Referer": "https://openrouter.ai/"
         }
 
-    def generate_linkedin_post(self, topic=None, industry=None, tone="professional"):
+    def generate_linkedin_post(self, topic=None, industry=None, tone="professional", word_count=200):
         """Generate a LinkedIn post using AI"""
         if not topic:
             topics = [
@@ -45,10 +45,11 @@ Context:
 - Industry: {industry}
 - Tone: {tone}
 - Topic: {topic}
+- Word Count: {word_count} words
 
 Requirements:
 - Make the content SPECIFIC to "{topic}" - don't be generic
-- Length: 3-5 sentences (150-250 words)
+- Length: Approximately {word_count} words
 - Include relevant emojis for visual appeal
 - Make it professional yet conversational
 - End with an engaging question related to {topic}
@@ -76,7 +77,7 @@ Generate a unique LinkedIn post:"""
                         {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry}. Create unique, specific, and engaging posts that provide real value to the audience. Each post should be different and tailored to the exact topic provided."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 400,
+                    "max_tokens": word_count,
                     "temperature": 0.8
                 }
             )
@@ -92,7 +93,7 @@ Generate a unique LinkedIn post:"""
             print(f"❌ Error: {e}")
             return self._get_fallback_post(topic, industry, tone)
 
-    def generate_post_from_article(self, url, industry=None, tone="professional"):
+    def generate_post_from_article(self, url, industry=None, tone="professional", word_count=200):
         """Generate LinkedIn post from article URL"""
         try:
             # Extract domain name for cleaner references
@@ -117,11 +118,12 @@ Context:
 - Industry: {industry or 'general'}
 - Tone: {tone}
 - Source: {source_name}
+- Word Count: {word_count} words
 
 Requirements:
 - Create an ACTUAL SUMMARY of the article's main points and key findings
 - Focus on the specific content, facts, and insights from the article
-- Length: 3-5 sentences (150-250 words)
+- Length: Approximately {word_count} words
 - Include relevant emojis for visual appeal
 - Make it professional yet engaging
 - End with an engaging question related to the article's specific topic
@@ -129,6 +131,7 @@ Requirements:
 - Reference specific details, numbers, or quotes from the article when possible
 - Make it clear this is a summary of the article's content
 - Don't be generic - focus on what the article actually says
+- Extract and highlight ONLY the most important points from the article
 
 Structure:
 1. Hook about the article's main finding or key point
@@ -153,7 +156,7 @@ Generate a LinkedIn post that actually summarizes this article:"""
                         {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Your job is to create ACTUAL SUMMARIES of articles that include specific details, facts, and insights from the article content. Focus on what the article actually says, not generic commentary. Always include specific information from the article in your summaries."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 500,
+                    "max_tokens": word_count,
                     "temperature": 0.8
                 }
             )
@@ -262,6 +265,38 @@ Generate a LinkedIn post that actually summarizes this article:"""
                 content = re.sub(r'\s+', ' ', content)
                 # Remove common unwanted text
                 content = re.sub(r'(cookie|privacy|terms|subscribe|newsletter|advertisement|ads)', '', content, flags=re.IGNORECASE)
+                
+                # Extract important sentences (those with key words or numbers)
+                sentences = content.split('.')
+                important_sentences = []
+                
+                # Keywords that indicate important content
+                important_keywords = [
+                    'announced', 'launched', 'released', 'introduced', 'developed', 'created',
+                    'reported', 'found', 'discovered', 'revealed', 'showed', 'indicated',
+                    'increased', 'decreased', 'grew', 'declined', 'reached', 'achieved',
+                    'million', 'billion', 'percent', '%', 'dollars', '$', 'users', 'customers',
+                    'technology', 'innovation', 'startup', 'company', 'business', 'market',
+                    'research', 'study', 'survey', 'analysis', 'data', 'results', 'findings'
+                ]
+                
+                for sentence in sentences:
+                    sentence = sentence.strip()
+                    if len(sentence) > 20:  # Only consider substantial sentences
+                        # Check if sentence contains important keywords or numbers
+                        has_keywords = any(keyword.lower() in sentence.lower() for keyword in important_keywords)
+                        has_numbers = bool(re.search(r'\d+', sentence))
+                        
+                        if has_keywords or has_numbers:
+                            important_sentences.append(sentence)
+                
+                # If we found important sentences, use them; otherwise use the original content
+                if important_sentences:
+                    content = '. '.join(important_sentences[:10])  # Limit to 10 most important sentences
+                else:
+                    # Fallback: use first few sentences that seem substantial
+                    content = '. '.join([s.strip() for s in sentences[:8] if len(s.strip()) > 30])
+                
                 # Limit length
                 content = content[:3000]
                 
@@ -336,19 +371,24 @@ def generate_post():
         post_type = data.get('type', 'topic')
         industry = data.get('industry', 'technology')
         tone = data.get('tone', 'professional')
+        word_count = int(data.get('wordCount', 200))  # Default to 200 words
+        
+        # Validate word count
+        if word_count < 50 or word_count > 1000:
+            return jsonify({'error': 'Word count must be between 50 and 1000'}), 400
         
         if post_type == 'article':
             url = data.get('url')
             if not url:
                 return jsonify({'error': 'URL is required for article type'}), 400
             
-            post = ai_generator.generate_post_from_article(url, industry, tone)
+            post = ai_generator.generate_post_from_article(url, industry, tone, word_count)
         else:
             topic = data.get('topic')
             if not topic:
                 return jsonify({'error': 'Topic is required for topic type'}), 400
             
-            post = ai_generator.generate_linkedin_post(topic, industry, tone)
+            post = ai_generator.generate_linkedin_post(topic, industry, tone, word_count)
         
         return jsonify({'post': post})
         
