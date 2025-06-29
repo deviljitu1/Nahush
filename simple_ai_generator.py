@@ -88,6 +88,8 @@ def main():
     
     generator = SimpleAIGenerator(api_key)
     
+    print(f"OPEN_ROUTER from environment: {OPENROUTER_API_KEY}")
+    
     while True:
         print("\n📝 Generate a LinkedIn Post")
         print("-" * 30)
