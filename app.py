@@ -5,7 +5,6 @@ import random
 import os
 from urllib.parse import urlparse
 import re
-from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -159,6 +158,14 @@ Generate a unique LinkedIn post based on the actual article content:"""
     def _extract_article_content(self, url):
         """Enhanced article content extraction using BeautifulSoup"""
         try:
+            # Try to import BeautifulSoup, fallback to simple extraction if it fails
+            try:
+                from bs4 import BeautifulSoup
+                use_beautifulsoup = True
+            except ImportError:
+                use_beautifulsoup = False
+                print("BeautifulSoup not available, using simple text extraction")
+            
             # Set up headers to mimic a real browser
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -172,64 +179,69 @@ Generate a unique LinkedIn post based on the actual article content:"""
             response = requests.get(url, timeout=15, headers=headers)
             response.raise_for_status()
             
-            # Parse with BeautifulSoup
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Remove script and style elements
-            for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
-                script.decompose()
-            
-            # Try to find the main content using common selectors
-            content_selectors = [
-                'article',
-                '[class*="content"]',
-                '[class*="article"]',
-                '[class*="post"]',
-                '[class*="entry"]',
-                '.post-content',
-                '.article-content',
-                '.entry-content',
-                '.content-body',
-                '.story-body',
-                '.article-body',
-                'main',
-                '.main-content',
-                '#content',
-                '.content',
-                '.text-content'
-            ]
-            
-            content = ""
-            title = ""
-            
-            # Extract title
-            title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
-            for selector in title_selectors:
-                title_elem = soup.select_one(selector)
-                if title_elem:
-                    title = title_elem.get_text().strip()
-                    if title and len(title) > 10:
+            if use_beautifulsoup:
+                # Parse with BeautifulSoup
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Remove script and style elements
+                for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                    script.decompose()
+                
+                # Try to find the main content using common selectors
+                content_selectors = [
+                    'article',
+                    '[class*="content"]',
+                    '[class*="article"]',
+                    '[class*="post"]',
+                    '[class*="entry"]',
+                    '.post-content',
+                    '.article-content',
+                    '.entry-content',
+                    '.content-body',
+                    '.story-body',
+                    '.article-body',
+                    'main',
+                    '.main-content',
+                    '#content',
+                    '.content',
+                    '.text-content'
+                ]
+                
+                content = ""
+                title = ""
+                
+                # Extract title
+                title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
+                for selector in title_selectors:
+                    title_elem = soup.select_one(selector)
+                    if title_elem:
+                        title = title_elem.get_text().strip()
+                        if title and len(title) > 10:
+                            break
+                
+                # Try to find main content
+                for selector in content_selectors:
+                    elements = soup.select(selector)
+                    for element in elements:
+                        text = element.get_text(separator=' ', strip=True)
+                        if len(text) > 200:  # Only consider substantial content
+                            content = text
+                            break
+                    if content:
                         break
-            
-            # Try to find main content
-            for selector in content_selectors:
-                elements = soup.select(selector)
-                for element in elements:
-                    text = element.get_text(separator=' ', strip=True)
-                    if len(text) > 200:  # Only consider substantial content
-                        content = text
-                        break
-                if content:
-                    break
-            
-            # If no specific content found, try to get body text
-            if not content:
-                body = soup.find('body')
-                if body:
-                    # Remove navigation, ads, and other non-content elements
-                    for elem in body.find_all(['nav', 'header', 'footer', 'aside', 'script', 'style']):
-                        elem.decompose()
-                    content = body.get_text(separator=' ', strip=True)
+                
+                # If no specific content found, try to get body text
+                if not content:
+                    body = soup.find('body')
+                    if body:
+                        # Remove navigation, ads, and other non-content elements
+                        for elem in body.find_all(['nav', 'header', 'footer', 'aside', 'script', 'style']):
+                            elem.decompose()
+                        content = body.get_text(separator=' ', strip=True)
+            else:
+                # Fallback to simple text extraction
+                content = re.sub(r'<[^>]+>', '', response.text)
+                title = ""
             
             # Clean up the content
             if content:
