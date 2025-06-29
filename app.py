@@ -110,20 +110,20 @@ Generate a unique LinkedIn post:"""
             # In production, you might want to use a more robust article extraction service
             article_content = self._extract_article_content(url)
             
-            prompt = f"""Create a LinkedIn post that SUMMARIZES this specific article from {source_name}.
+            prompt = f"""Create a LinkedIn post that SUMMARIZES this specific news article from {source_name}.
 
-Article content: {article_content[:1500]}...
+Article content: {article_content[:2000]}...
 
 Context:
 - Industry: {industry or 'general'}
 - Tone: {tone}
 - Source: {source_name}
-- Word Count: {word_count} words
+- Word Count: EXACTLY {word_count} words (not more, not less)
 
 Requirements:
-- Create an ACTUAL SUMMARY of the article's main points and key findings
-- Focus on the specific content, facts, and insights from the article
-- Length: Approximately {word_count} words
+- Create an ACTUAL SUMMARY of the article's main news points and key facts
+- Focus on the specific news content, facts, and important details from the article
+- Length: EXACTLY {word_count} words - count carefully
 - Include relevant emojis for visual appeal
 - Make it professional yet engaging
 - End with an engaging question related to the article's specific topic
@@ -131,21 +131,22 @@ Requirements:
 - Reference specific details, numbers, or quotes from the article when possible
 - Make it clear this is a summary of the article's content
 - Don't be generic - focus on what the article actually says
-- Extract and highlight ONLY the most important points from the article
+- Extract and highlight ONLY the most important news points from the article
+- Use the exact word count specified: {word_count} words
 
 Structure:
-1. Hook about the article's main finding or key point
-2. Summary of the article's most important details and insights
+1. Hook about the article's main news finding or key point
+2. Summary of the article's most important details and facts
 3. Why this matters to your audience
 4. Engaging question about the article's topic
 5. Relevant hashtags
 
-Example format:
-"📰 [Article Title] from {source_name} reveals [key finding]. The article discusses [specific details from article]. This matters because [why it's important]. What's your take on [specific aspect from article]?
+Example format for news articles:
+"📰 [Article Title] from {source_name} reveals [key news finding]. The article reports [specific details from article]. This matters because [why it's important]. What's your take on [specific aspect from article]?
 
 #[relevant hashtags]"
 
-Generate a LinkedIn post that actually summarizes this article:"""
+Generate a LinkedIn post that actually summarizes this news article in EXACTLY {word_count} words:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -153,7 +154,7 @@ Generate a LinkedIn post that actually summarizes this article:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Your job is to create ACTUAL SUMMARIES of articles that include specific details, facts, and insights from the article content. Focus on what the article actually says, not generic commentary. Always include specific information from the article in your summaries."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Your job is to create ACTUAL SUMMARIES of news articles that include specific details, facts, and insights from the article content. Focus on what the article actually says, not generic commentary. Always include specific information from the article in your summaries. CRITICAL: You must generate EXACTLY the number of words specified by the user - count carefully and do not exceed or fall short of the target word count."},
                         {"role": "user", "content": prompt}
                     ],
                     "max_tokens": word_count,
@@ -203,7 +204,17 @@ Generate a LinkedIn post that actually summarizes this article:"""
                 for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
                     script.decompose()
                 
-                # Try to find the main content using common selectors
+                # Extract title first
+                title = ""
+                title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
+                for selector in title_selectors:
+                    title_elem = soup.select_one(selector)
+                    if title_elem:
+                        title = title_elem.get_text().strip()
+                        if title and len(title) > 10:
+                            break
+                
+                # Try to find main content using news-specific selectors
                 content_selectors = [
                     'article',
                     '[class*="content"]',
@@ -216,6 +227,8 @@ Generate a LinkedIn post that actually summarizes this article:"""
                     '.content-body',
                     '.story-body',
                     '.article-body',
+                    '.news-content',
+                    '.story-content',
                     'main',
                     '.main-content',
                     '#content',
@@ -224,23 +237,13 @@ Generate a LinkedIn post that actually summarizes this article:"""
                 ]
                 
                 content = ""
-                title = ""
-                
-                # Extract title
-                title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
-                for selector in title_selectors:
-                    title_elem = soup.select_one(selector)
-                    if title_elem:
-                        title = title_elem.get_text().strip()
-                        if title and len(title) > 10:
-                            break
                 
                 # Try to find main content
                 for selector in content_selectors:
                     elements = soup.select(selector)
                     for element in elements:
                         text = element.get_text(separator=' ', strip=True)
-                        if len(text) > 200:  # Only consider substantial content
+                        if len(text) > 300:  # Only consider substantial content
                             content = text
                             break
                     if content:
@@ -264,41 +267,66 @@ Generate a LinkedIn post that actually summarizes this article:"""
                 # Remove extra whitespace
                 content = re.sub(r'\s+', ' ', content)
                 # Remove common unwanted text
-                content = re.sub(r'(cookie|privacy|terms|subscribe|newsletter|advertisement|ads)', '', content, flags=re.IGNORECASE)
+                content = re.sub(r'(cookie|privacy|terms|subscribe|newsletter|advertisement|ads|sign in|sign up|login|register)', '', content, flags=re.IGNORECASE)
                 
-                # Extract important sentences (those with key words or numbers)
+                # Extract important news sentences (those with key words or numbers)
                 sentences = content.split('.')
                 important_sentences = []
                 
-                # Keywords that indicate important content
-                important_keywords = [
+                # Keywords that indicate important news content
+                news_keywords = [
+                    # Action words
                     'announced', 'launched', 'released', 'introduced', 'developed', 'created',
                     'reported', 'found', 'discovered', 'revealed', 'showed', 'indicated',
-                    'increased', 'decreased', 'grew', 'declined', 'reached', 'achieved',
+                    'arrested', 'charged', 'accused', 'investigated', 'probed', 'questioned',
+                    'filed', 'submitted', 'complained', 'alleged', 'claimed', 'stated',
+                    
+                    # Numbers and data
                     'million', 'billion', 'percent', '%', 'dollars', '$', 'users', 'customers',
+                    'people', 'students', 'victims', 'suspects', 'accused', 'witnesses',
+                    
+                    # News-specific terms
+                    'police', 'investigation', 'case', 'incident', 'crime', 'victim',
+                    'survivor', 'accused', 'suspect', 'arrest', 'charge', 'trial',
+                    'court', 'judge', 'lawyer', 'advocate', 'prosecution', 'defense',
+                    'evidence', 'witness', 'testimony', 'statement', 'complaint',
+                    
+                    # Location and time
+                    'kolkata', 'delhi', 'mumbai', 'bangalore', 'chennai', 'hyderabad',
+                    'india', 'state', 'city', 'district', 'area', 'location',
+                    'yesterday', 'today', 'morning', 'evening', 'night', 'week',
+                    'month', 'year', 'date', 'time', 'period',
+                    
+                    # Educational/Institutional terms
+                    'college', 'university', 'school', 'institution', 'authority',
+                    'administration', 'faculty', 'staff', 'student', 'teacher',
+                    'principal', 'director', 'head', 'official', 'committee',
+                    
+                    # General important terms
                     'technology', 'innovation', 'startup', 'company', 'business', 'market',
                     'research', 'study', 'survey', 'analysis', 'data', 'results', 'findings'
                 ]
                 
                 for sentence in sentences:
                     sentence = sentence.strip()
-                    if len(sentence) > 20:  # Only consider substantial sentences
+                    if len(sentence) > 25:  # Only consider substantial sentences
                         # Check if sentence contains important keywords or numbers
-                        has_keywords = any(keyword.lower() in sentence.lower() for keyword in important_keywords)
+                        has_keywords = any(keyword.lower() in sentence.lower() for keyword in news_keywords)
                         has_numbers = bool(re.search(r'\d+', sentence))
+                        has_quotes = '"' in sentence or "'" in sentence  # Quotes often contain important info
                         
-                        if has_keywords or has_numbers:
+                        if has_keywords or has_numbers or has_quotes:
                             important_sentences.append(sentence)
                 
                 # If we found important sentences, use them; otherwise use the original content
                 if important_sentences:
-                    content = '. '.join(important_sentences[:10])  # Limit to 10 most important sentences
+                    content = '. '.join(important_sentences[:15])  # Limit to 15 most important sentences
                 else:
                     # Fallback: use first few sentences that seem substantial
-                    content = '. '.join([s.strip() for s in sentences[:8] if len(s.strip()) > 30])
+                    content = '. '.join([s.strip() for s in sentences[:10] if len(s.strip()) > 30])
                 
                 # Limit length
-                content = content[:3000]
+                content = content[:4000]  # Increased limit for better content
                 
                 # Combine title and content
                 if title:
