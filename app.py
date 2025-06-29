@@ -280,42 +280,33 @@ def script():
     """Serve the JavaScript file"""
     return send_from_directory('.', 'script.js')
 
-@app.route('/api/generate-post', methods=['POST'])
+@app.route('/generate', methods=['POST'])
 def generate_post():
-    """API endpoint to generate LinkedIn posts"""
+    """Generate LinkedIn post endpoint"""
     try:
         data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        post_type = data.get('type', 'topic')
+        topic = data.get('topic', '').strip()
         industry = data.get('industry', 'technology')
         tone = data.get('tone', 'professional')
-        word_count = int(data.get('wordCount', 200))  # Default to 200 words
+        word_count = int(data.get('word_count', 200))
         
-        # Validate word count
+        if not topic:
+            return jsonify({'error': 'Topic is required'}), 400
+        
         if word_count < 50 or word_count > 1000:
             return jsonify({'error': 'Word count must be between 50 and 1000'}), 400
         
-        if post_type == 'article':
-            url = data.get('url')
-            if not url:
-                return jsonify({'error': 'URL is required for article type'}), 400
-            
-            post = ai_generator.generate_post_from_article(url, industry, tone, word_count)
+        # Check if topic is a URL
+        if topic.startswith(('http://', 'https://')):
+            post = ai_generator.generate_post_from_article(topic, industry, tone, word_count)
         else:
-            topic = data.get('topic')
-            if not topic:
-                return jsonify({'error': 'Topic is required for topic type'}), 400
-            
             post = ai_generator.generate_linkedin_post(topic, industry, tone, word_count)
         
         return jsonify({'post': post})
         
     except Exception as e:
         print(f"Error generating post: {e}")
-        return jsonify({'error': 'Failed to generate post'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/health')
 def health():
