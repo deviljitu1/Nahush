@@ -109,38 +109,40 @@ Generate a unique LinkedIn post:"""
             # In production, you might want to use a more robust article extraction service
             article_content = self._extract_article_content(url)
             
-            prompt = f"""Create a unique LinkedIn post summarizing this article from {source_name}: {url}
+            prompt = f"""Create a LinkedIn post that SUMMARIZES this specific article from {source_name}.
 
 Article content: {article_content[:1500]}...
 
 Context:
 - Industry: {industry or 'general'}
 - Tone: {tone}
-- Source: Article from {source_name}
+- Source: {source_name}
 
 Requirements:
-- Create a UNIQUE summary specific to this article's actual content
-- Focus on the main points and key insights from the article
+- Create an ACTUAL SUMMARY of the article's main points and key findings
+- Focus on the specific content, facts, and insights from the article
 - Length: 3-5 sentences (150-250 words)
 - Include relevant emojis for visual appeal
 - Make it professional yet engaging
-- End with an engaging question related to the article's topic
+- End with an engaging question related to the article's specific topic
 - Include 5-7 relevant hashtags specific to the article's subject matter
-- Add your perspective or insights about the article's implications
-- Make it shareable and thought-provoking
-- Include a call-to-action
-- If the article has a clear title, reference it naturally
-- Don't be generic - make it specific to what the article actually says
-- Reference the source as "{source_name}" not the full URL
+- Reference specific details, numbers, or quotes from the article when possible
+- Make it clear this is a summary of the article's content
+- Don't be generic - focus on what the article actually says
 
 Structure:
-1. Hook about the article's key insight or main point
-2. Your take on the article's most important findings/points
-3. Why this matters to your audience and industry
-4. Engaging question for discussion
+1. Hook about the article's main finding or key point
+2. Summary of the article's most important details and insights
+3. Why this matters to your audience
+4. Engaging question about the article's topic
 5. Relevant hashtags
 
-Generate a unique LinkedIn post based on the actual article content:"""
+Example format:
+"📰 [Article Title] from {source_name} reveals [key finding]. The article discusses [specific details from article]. This matters because [why it's important]. What's your take on [specific aspect from article]?
+
+#[relevant hashtags]"
+
+Generate a LinkedIn post that actually summarizes this article:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -148,7 +150,7 @@ Generate a unique LinkedIn post based on the actual article content:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Create unique, specific summaries that add value and perspective to articles. Each summary should be different and tailored to the specific article content. Always reference the source by name, not URL."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Your job is to create ACTUAL SUMMARIES of articles that include specific details, facts, and insights from the article content. Focus on what the article actually says, not generic commentary. Always include specific information from the article in your summaries."},
                         {"role": "user", "content": prompt}
                     ],
                     "max_tokens": 500,
@@ -294,13 +296,13 @@ Generate a unique LinkedIn post based on the actual article content:"""
                 topic_clean = "this article"
         
         fallback_posts = [
-            f"🚀 Excited to dive deep into {topic_clean}! The {industry_clean} landscape is evolving rapidly, and understanding {topic_clean} is crucial for staying ahead. What's your biggest challenge with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"📰 Interesting article from {topic_clean}! The piece covers important developments in {industry_clean} that could impact how we approach our work. What specific insights from this article resonate with your experience?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"💡 Just explored the fascinating world of {topic_clean} in {industry_clean}! The insights I've gained are game-changing. How has {topic_clean} impacted your professional journey?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"🔍 Just read a compelling piece from {topic_clean} about {industry_clean} trends. The article highlights key points that professionals in our field should consider. Which aspects of this coverage stand out to you?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"🎯 {topic_clean} is revolutionizing how we approach {industry_clean}! The opportunities are endless for those willing to adapt. What's your experience with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"📊 {topic_clean} published an insightful article on {industry_clean} developments. The coverage provides valuable perspectives that could influence our industry approach. What's your reaction to the main points discussed?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"🔥 The future of {industry_clean} lies in mastering {topic_clean}! It's not just about keeping up—it's about leading the way. How are you leveraging {topic_clean} in your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
+            f"💡 Worthwhile read from {topic_clean} on {industry_clean} topics. The article presents important information that professionals should be aware of. How do you see these insights applying to your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
         ]
         return random.choice(fallback_posts)
 
