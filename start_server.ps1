@@ -68,10 +68,14 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   Starting Server" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "🚀 Starting LinkedIn AI Post Generator Server..." -ForegroundColor Green
-Write-Host "📁 Server will run on: http://localhost:8000" -ForegroundColor White
-Write-Host "🌐 Open your browser and go to: http://localhost:8000" -ForegroundColor White
-Write-Host "⏹️  Press Ctrl+C to stop the server" -ForegroundColor Yellow
+Write-Host "🚀 LinkedIn AI Post Generator Server" -ForegroundColor Green
+Write-Host ""
+
+# ⚠️  IMPORTANT: Replace YOUR-API-KEY-HERE with your actual OpenRouter API key
+$env:OPEN_ROUTER = "YOUR-API-KEY-HERE"
+
+Write-Host "✅ API Key set (if you replaced the placeholder above)" -ForegroundColor Yellow
+Write-Host "🌐 Starting server..." -ForegroundColor Cyan
 Write-Host ""
 
 # Start the server
