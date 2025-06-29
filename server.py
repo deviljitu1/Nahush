@@ -16,26 +16,28 @@ import urllib.request
 from bs4 import BeautifulSoup
 
 # Configuration
-PORT = 8000
-DIRECTORY = Path(__file__).parent
+DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+PORT = int(os.environ.get('PORT', 8000))  # Railway sets PORT environment variable
+HOST = os.environ.get('HOST', '0.0.0.0')  # Railway uses 0.0.0.0
+OPENROUTER_API_KEY = os.environ.get('OPEN_ROUTER')
 
-# Get API key from environment variable
-OPENROUTER_API_KEY = os.getenv('OPEN_ROUTER')
+# Check if API key is set
 if not OPENROUTER_API_KEY:
     print("⚠️  Warning: OPEN_ROUTER environment variable not set!")
     print("Please set your OpenRouter API key as an environment variable:")
     print("set OPEN_ROUTER=your-api-key-here")
-    OPENROUTER_API_KEY = "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"  # Fallback
+    print("Or set it in Railway dashboard under Variables section")
+    # Don't exit - let Railway handle it
 
 class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(DIRECTORY), **kwargs)
+        super().__init__(*args, directory=DIRECTORY, **kwargs)
     
     def end_headers(self):
         # Add CORS headers for web API calls
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         super().end_headers()
     
     def do_OPTIONS(self):
@@ -47,14 +49,20 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if self.path == '/api/generate-post':
             self.handle_generate_post()
         else:
-            self.send_error(404, "API endpoint not found")
+            self.send_error(404)
     
     def handle_generate_post(self):
+        """Handle POST requests to generate LinkedIn posts"""
         try:
-            # Read request body
+            # Get request data
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
+            
+            # Check if we have an API key
+            if not OPENROUTER_API_KEY:
+                self.send_error(500, "OpenRouter API key not configured")
+                return
             
             # Generate post based on type
             if data.get('type') == 'article':
@@ -63,53 +71,54 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 post = self.generate_post_from_topic(data['topic'], data['industry'], data['tone'])
             
             # Send response
+            response = {'post': post}
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            response = {'post': post}
             self.wfile.write(json.dumps(response).encode())
             
         except Exception as e:
             print(f"Error generating post: {e}")
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            response = {'error': str(e)}
-            self.wfile.write(json.dumps(response).encode())
+            self.send_error(500, str(e))
     
     def generate_post_from_topic(self, topic, industry, tone):
-        """Generate LinkedIn post from topic using OpenRouter API"""
-        prompt = self.create_topic_prompt(topic, industry, tone)
-        
-        response = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://openrouter.ai/'
-            },
-            json={
-                'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
-                'messages': [
-                    {
-                        'role': 'system',
-                        'content': 'You are a professional LinkedIn content creator. Create engaging, authentic posts that drive engagement and provide value to the audience.'
-                    },
-                    {
-                        'role': 'user',
-                        'content': prompt
-                    }
-                ],
-                'max_tokens': 300,
-                'temperature': 0.7
-            }
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"OpenRouter API error: {response.text}")
-        
-        data = response.json()
-        return data['choices'][0]['message']['content'].strip()
+        """Generate LinkedIn post from topic"""
+        try:
+            prompt = self.create_topic_prompt(topic, industry, tone)
+            
+            response = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://openrouter.ai/'
+                },
+                json={
+                    'model': 'mistralai/mistral-small-3.2-24b-instruct:free',
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': 'You are a professional LinkedIn content creator. Create engaging posts that drive engagement and build professional relationships.'
+                        },
+                        {
+                            'role': 'user',
+                            'content': prompt
+                        }
+                    ],
+                    'max_tokens': 400,
+                    'temperature': 0.7
+                }
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"OpenRouter API error: {response.text}")
+            
+            data = response.json()
+            return data['choices'][0]['message']['content'].strip()
+            
+        except Exception as e:
+            print(f"Error generating post from topic: {e}")
+            raise e
     
     def generate_post_from_article(self, url, industry, tone):
         """Generate LinkedIn post from article URL"""
@@ -267,31 +276,40 @@ Format:
 Generate the LinkedIn post:"""
 
 def main():
-    """Start the HTTP server and open the browser"""
+    """Start the HTTP server"""
     
     # Change to the directory containing this script
     os.chdir(DIRECTORY)
     
     # Create server
-    with socketserver.TCPServer(("", PORT), CustomHTTPRequestHandler) as httpd:
+    with socketserver.TCPServer((HOST, PORT), CustomHTTPRequestHandler) as httpd:
         print(f"🚀 LinkedIn AI Post Generator Server")
         print(f"📁 Serving files from: {DIRECTORY}")
-        print(f"🌐 Server running at: http://localhost:{PORT}")
-        print(f"📱 Open your browser and go to: http://localhost:{PORT}")
-        print(f"⏹️  Press Ctrl+C to stop the server")
+        print(f"🌐 Server running at: http://{HOST}:{PORT}")
+        
+        # Check if running on Railway
+        if os.environ.get('RAILWAY_ENVIRONMENT'):
+            print(f"🚂 Deployed on Railway")
+            print(f"🔗 Public URL: https://{os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'your-app.railway.app')}")
+        else:
+            print(f"📱 Open your browser and go to: http://localhost:{PORT}")
+            print(f"⏹️  Press Ctrl+C to stop the server")
+        
         print("-" * 50)
         
         if OPENROUTER_API_KEY:
             print("✅ OpenRouter API key configured")
         else:
             print("⚠️  OpenRouter API key not found in environment variables")
+            print("Set OPEN_ROUTER variable in Railway dashboard")
         
-        # Open browser automatically
-        try:
-            webbrowser.open(f'http://localhost:{PORT}')
-            print("✅ Browser opened automatically!")
-        except:
-            print("⚠️  Could not open browser automatically. Please open it manually.")
+        # Open browser automatically (only for local development)
+        if not os.environ.get('RAILWAY_ENVIRONMENT'):
+            try:
+                webbrowser.open(f'http://localhost:{PORT}')
+                print("✅ Browser opened automatically!")
+            except:
+                print("⚠️  Could not open browser automatically. Please open it manually.")
         
         print("\n🎯 Features:")
         print("• Generate LinkedIn posts with AI")
