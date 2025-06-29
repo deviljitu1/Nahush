@@ -13,7 +13,7 @@ app = Flask(__name__)
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCR2qkH4DXw4jBXbT94YnAOgwaSD6r-rBI')
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 class AIGenerator:
     def __init__(self, openrouter_api_key, gemini_api_key):
@@ -207,25 +207,42 @@ class AIGenerator:
                 'Content-Type': 'application/json'
             }
             data = {
-                "contents": [{"parts": [{"text": prompt}]}],
+                "contents": [{
+                    "parts": [{
+                        "text": prompt
+                    }]
+                }],
                 "generationConfig": {
                     "maxOutputTokens": min(word_count * 2, 1024),
-                    "temperature": 0.9
+                    "temperature": 0.9,
+                    "topP": 0.8,
+                    "topK": 40
                 }
             }
+            
+            # Use the correct Gemini API endpoint
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_api_key}"
+            
             response = requests.post(
-                f"{GEMINI_API_URL}?key={self.gemini_api_key}",
+                url,
                 headers=headers,
                 json=data,
                 timeout=60
             )
+            
             if response.status_code == 200:
                 result = response.json()
-                # Gemini's response structure
-                return result['candidates'][0]['content']['parts'][0]['text'].strip()
+                # Extract text from Gemini response
+                if 'candidates' in result and len(result['candidates']) > 0:
+                    content = result['candidates'][0]['content']['parts'][0]['text']
+                    return content.strip()
+                else:
+                    print(f"Unexpected Gemini response structure: {result}")
+                    return "[AI Error: Unexpected response from Gemini]"
             else:
                 print(f"Gemini API Error: {response.status_code} - {response.text}")
                 return "[AI Error: Unable to generate content from both OpenRouter and Gemini]"
+                
         except Exception as e:
             print(f"Gemini fallback failed: {e}")
             return "[AI Error: Unable to generate content from both OpenRouter and Gemini]"
