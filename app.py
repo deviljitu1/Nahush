@@ -95,18 +95,28 @@ Generate a unique LinkedIn post:"""
     def generate_post_from_article(self, url, industry=None, tone="professional"):
         """Generate LinkedIn post from article URL"""
         try:
+            # Extract domain name for cleaner references
+            try:
+                from urllib.parse import urlparse
+                parsed_url = urlparse(url)
+                domain = parsed_url.netloc.replace('www.', '')
+                source_name = domain.split('.')[0].title()  # Get first part of domain
+            except:
+                domain = "the article"
+                source_name = "the source"
+            
             # Extract content from URL using a simple approach
             # In production, you might want to use a more robust article extraction service
             article_content = self._extract_article_content(url)
             
-            prompt = f"""Create a unique LinkedIn post summarizing this article: {url}
+            prompt = f"""Create a unique LinkedIn post summarizing this article from {source_name}: {url}
 
 Article content: {article_content[:1500]}...
 
 Context:
 - Industry: {industry or 'general'}
 - Tone: {tone}
-- Source: Article from {url}
+- Source: Article from {source_name}
 
 Requirements:
 - Create a UNIQUE summary specific to this article's actual content
@@ -121,6 +131,7 @@ Requirements:
 - Include a call-to-action
 - If the article has a clear title, reference it naturally
 - Don't be generic - make it specific to what the article actually says
+- Reference the source as "{source_name}" not the full URL
 
 Structure:
 1. Hook about the article's key insight or main point
@@ -137,7 +148,7 @@ Generate a unique LinkedIn post based on the actual article content:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Create unique, specific summaries that add value and perspective to articles. Each summary should be different and tailored to the specific article content."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Create unique, specific summaries that add value and perspective to articles. Each summary should be different and tailored to the specific article content. Always reference the source by name, not URL."},
                         {"role": "user", "content": prompt}
                     ],
                     "max_tokens": 500,
@@ -149,11 +160,11 @@ Generate a unique LinkedIn post based on the actual article content:"""
                 result = response.json()
                 return result['choices'][0]['message']['content'].strip()
             else:
-                return self._get_fallback_post(f"article from {url}", industry, tone)
+                return self._get_fallback_post(f"article from {source_name}", industry, tone)
                 
         except Exception as e:
             print(f"❌ Error generating from article: {e}")
-            return self._get_fallback_post(f"article from {url}", industry, tone)
+            return self._get_fallback_post(f"article from {source_name}", industry, tone)
 
     def _extract_article_content(self, url):
         """Enhanced article content extraction using BeautifulSoup"""
@@ -272,14 +283,24 @@ Generate a unique LinkedIn post based on the actual article content:"""
         topic_clean = topic.replace('"', '').strip()
         industry_clean = industry.replace('"', '').strip()
         
+        # Extract domain name if topic contains a URL
+        if topic_clean.startswith('http'):
+            try:
+                from urllib.parse import urlparse
+                parsed_url = urlparse(topic_clean)
+                domain = parsed_url.netloc.replace('www.', '')
+                topic_clean = f"article from {domain}"
+            except:
+                topic_clean = "this article"
+        
         fallback_posts = [
-            f"🚀 Excited to dive deep into {topic_clean}! The {industry_clean} landscape is evolving rapidly, and understanding {topic_clean} is crucial for staying ahead. What's your biggest challenge with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"🚀 Excited to dive deep into {topic_clean}! The {industry_clean} landscape is evolving rapidly, and understanding {topic_clean} is crucial for staying ahead. What's your biggest challenge with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"💡 Just explored the fascinating world of {topic_clean} in {industry_clean}! The insights I've gained are game-changing. How has {topic_clean} impacted your professional journey?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"💡 Just explored the fascinating world of {topic_clean} in {industry_clean}! The insights I've gained are game-changing. How has {topic_clean} impacted your professional journey?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"🎯 {topic_clean} is revolutionizing how we approach {industry_clean}! The opportunities are endless for those willing to adapt. What's your experience with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
+            f"🎯 {topic_clean} is revolutionizing how we approach {industry_clean}! The opportunities are endless for those willing to adapt. What's your experience with {topic_clean}?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
             
-            f"🔥 The future of {industry_clean} lies in mastering {topic_clean}! It's not just about keeping up—it's about leading the way. How are you leveraging {topic_clean} in your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
+            f"🔥 The future of {industry_clean} lies in mastering {topic_clean}! It's not just about keeping up—it's about leading the way. How are you leveraging {topic_clean} in your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
         ]
         return random.choice(fallback_posts)
 
