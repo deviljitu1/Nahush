@@ -5,6 +5,7 @@ import random
 import os
 from urllib.parse import urlparse
 import re
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -101,7 +102,7 @@ Generate a unique LinkedIn post:"""
             
             prompt = f"""Create a unique LinkedIn post summarizing this article: {url}
 
-Article content: {article_content[:1000]}...
+Article content: {article_content[:1500]}...
 
 Context:
 - Industry: {industry or 'general'}
@@ -109,25 +110,27 @@ Context:
 - Source: Article from {url}
 
 Requirements:
-- Create a UNIQUE summary specific to this article's content
+- Create a UNIQUE summary specific to this article's actual content
+- Focus on the main points and key insights from the article
 - Length: 3-5 sentences (150-250 words)
 - Include relevant emojis for visual appeal
 - Make it professional yet engaging
-- End with an engaging question related to the article
-- Include 5-7 relevant hashtags specific to the article topic
-- Add your perspective or insights about the article
+- End with an engaging question related to the article's topic
+- Include 5-7 relevant hashtags specific to the article's subject matter
+- Add your perspective or insights about the article's implications
 - Make it shareable and thought-provoking
 - Include a call-to-action
-- Mention it's based on an article but make it your own take
+- If the article has a clear title, reference it naturally
+- Don't be generic - make it specific to what the article actually says
 
 Structure:
-1. Hook about the article's key insight
-2. Your take on the article's main points
-3. Why this matters to the audience
+1. Hook about the article's key insight or main point
+2. Your take on the article's most important findings/points
+3. Why this matters to your audience and industry
 4. Engaging question for discussion
 5. Relevant hashtags
 
-Generate a unique LinkedIn post:"""
+Generate a unique LinkedIn post based on the actual article content:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -154,20 +157,102 @@ Generate a unique LinkedIn post:"""
             return self._get_fallback_post(f"article from {url}", industry, tone)
 
     def _extract_article_content(self, url):
-        """Simple article content extraction"""
+        """Enhanced article content extraction using BeautifulSoup"""
         try:
-            response = requests.get(url, timeout=10, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
+            # Set up headers to mimic a real browser
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            response = requests.get(url, timeout=15, headers=headers)
             response.raise_for_status()
             
-            # Simple text extraction - remove HTML tags
-            content = re.sub(r'<[^>]+>', '', response.text)
-            content = re.sub(r'\s+', ' ', content).strip()
+            # Parse with BeautifulSoup
+            soup = BeautifulSoup(response.content, 'html.parser')
             
-            return content[:2000]  # Limit content length
-        except:
-            return "Article content could not be extracted."
+            # Remove script and style elements
+            for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                script.decompose()
+            
+            # Try to find the main content using common selectors
+            content_selectors = [
+                'article',
+                '[class*="content"]',
+                '[class*="article"]',
+                '[class*="post"]',
+                '[class*="entry"]',
+                '.post-content',
+                '.article-content',
+                '.entry-content',
+                '.content-body',
+                '.story-body',
+                '.article-body',
+                'main',
+                '.main-content',
+                '#content',
+                '.content',
+                '.text-content'
+            ]
+            
+            content = ""
+            title = ""
+            
+            # Extract title
+            title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
+            for selector in title_selectors:
+                title_elem = soup.select_one(selector)
+                if title_elem:
+                    title = title_elem.get_text().strip()
+                    if title and len(title) > 10:
+                        break
+            
+            # Try to find main content
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                for element in elements:
+                    text = element.get_text(separator=' ', strip=True)
+                    if len(text) > 200:  # Only consider substantial content
+                        content = text
+                        break
+                if content:
+                    break
+            
+            # If no specific content found, try to get body text
+            if not content:
+                body = soup.find('body')
+                if body:
+                    # Remove navigation, ads, and other non-content elements
+                    for elem in body.find_all(['nav', 'header', 'footer', 'aside', 'script', 'style']):
+                        elem.decompose()
+                    content = body.get_text(separator=' ', strip=True)
+            
+            # Clean up the content
+            if content:
+                # Remove extra whitespace
+                content = re.sub(r'\s+', ' ', content)
+                # Remove common unwanted text
+                content = re.sub(r'(cookie|privacy|terms|subscribe|newsletter|advertisement|ads)', '', content, flags=re.IGNORECASE)
+                # Limit length
+                content = content[:3000]
+                
+                # Combine title and content
+                if title:
+                    full_content = f"Title: {title}\n\nContent: {content}"
+                else:
+                    full_content = content
+                
+                return full_content
+            else:
+                return f"Article content could not be extracted from {url}. Please check the URL and try again."
+                
+        except Exception as e:
+            print(f"Error extracting content from {url}: {e}")
+            return f"Unable to extract content from {url}. Error: {str(e)}"
 
     def _get_fallback_post(self, topic, industry, tone):
         """Fallback post if AI fails"""
