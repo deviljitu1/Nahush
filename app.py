@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 # Configuration
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 class AIGenerator:
