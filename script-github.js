@@ -1,5 +1,13 @@
-// API Configuration - API calls will be made through the backend
-const API_URL = 'http://localhost:8000/api/generate-post';
+// GitHub-ready version - works both locally and on GitHub Pages
+// Users need to add their own API key to make it work
+
+// API Configuration
+const LOCAL_API_URL = 'http://localhost:8000/api/generate-post';
+const GITHUB_API_URL = 'https://your-backend-url.com/api/generate-post'; // For production
+
+// Detect if running locally or on GitHub Pages
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_URL = isLocal ? LOCAL_API_URL : null; // Will be null on GitHub Pages
 
 // DOM Elements
 const postForm = document.getElementById('postForm');
@@ -22,6 +30,12 @@ async function handleFormSubmit(e) {
     const topic = document.getElementById('topic').value.trim();
     const industry = document.getElementById('industry').value;
     const tone = document.getElementById('tone').value;
+    
+    // Check if we're on GitHub Pages (no local server)
+    if (!isLocal) {
+        showGitHubSetupNotice();
+        return;
+    }
     
     // Show loading spinner
     showLoading();
@@ -47,66 +61,99 @@ async function handleFormSubmit(e) {
     }
 }
 
+// Show GitHub setup notice
+function showGitHubSetupNotice() {
+    const notice = `
+🔑 API Key Setup Required
+
+This tool requires an OpenRouter API key to work.
+
+📋 Setup Instructions:
+1. Get a free API key from https://openrouter.ai
+2. Download the local version for full functionality
+3. Or add your API key to the code
+
+💡 Quick Start:
+• Clone the repository
+• Run: python server.py
+• Visit: http://localhost:8000
+
+Would you like to see detailed setup instructions?
+    `;
+    
+    if (confirm(notice)) {
+        showDetailedInstructions();
+    }
+}
+
+// Show detailed setup instructions
+function showDetailedInstructions() {
+    const instructions = `
+🔧 Detailed Setup Instructions:
+
+📥 Option 1: Local Setup (Recommended)
+1. Clone the repository:
+   git clone https://github.com/yourusername/linkedin-ai-post-generator.git
+
+2. Navigate to the folder:
+   cd linkedin-ai-post-generator
+
+3. Set your API key:
+   set OPEN_ROUTER=your-api-key-here
+
+4. Install dependencies:
+   pip install -r requirements.txt
+
+5. Start the server:
+   python server.py
+
+6. Open http://localhost:8000
+
+📝 Option 2: Add API Key to Code
+1. Get API key from https://openrouter.ai
+2. Edit script.js
+3. Replace YOUR_API_KEY_HERE with your key
+4. Upload to GitHub Pages
+
+🔗 Repository: https://github.com/yourusername/linkedin-ai-post-generator
+    `;
+    
+    alert(instructions);
+}
+
 // Check if input is a valid URL
 function isValidURL(string) {
     return URL_REGEX.test(string);
 }
 
-// Extract article content from URL
-async function extractArticleContent(url) {
-    try {
-        // Use a CORS proxy to fetch the article content
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
-        
-        if (data.contents) {
-            // Parse the HTML content
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data.contents, 'text/html');
-            
-            // Extract text content from common article selectors
-            const selectors = [
-                'article',
-                '[class*="content"]',
-                '[class*="article"]',
-                '[class*="post"]',
-                '.post-content',
-                '.article-content',
-                '.entry-content',
-                'main',
-                '.main-content'
-            ];
-            
-            let content = '';
-            for (const selector of selectors) {
-                const element = doc.querySelector(selector);
-                if (element) {
-                    content = element.textContent.trim();
-                    if (content.length > 100) break;
-                }
-            }
-            
-            // If no specific content found, get body text
-            if (!content || content.length < 100) {
-                content = doc.body.textContent.trim();
-            }
-            
-            // Clean up the content
-            content = content.replace(/\s+/g, ' ').substring(0, 2000);
-            
-            return {
-                title: doc.title || 'Article',
-                content: content,
-                url: url
-            };
-        }
-        
-        throw new Error('Could not extract content from URL');
-    } catch (error) {
-        console.error('Error extracting article content:', error);
-        throw new Error('Failed to extract article content. Please check the URL and try again.');
+// Generate LinkedIn post using backend API
+async function generateLinkedInPost(topic, industry, tone) {
+    console.log('Making API call to:', API_URL);
+    
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            type: 'topic',
+            topic: topic,
+            industry: industry,
+            tone: tone
+        })
+    });
+    
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    return data.post;
 }
 
 // Generate LinkedIn post from article URL using backend API
@@ -136,37 +183,6 @@ async function generateLinkedInPostFromArticle(url, industry, tone) {
     
     const data = await response.json();
     console.log('Article response data:', data);
-    return data.post;
-}
-
-// Generate LinkedIn post using backend API
-async function generateLinkedInPost(topic, industry, tone) {
-    console.log('Making API call to:', API_URL);
-    
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            type: 'topic',
-            topic: topic,
-            industry: industry,
-            tone: tone
-        })
-    });
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-    
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Response data:', data);
     return data.post;
 }
 
@@ -221,69 +237,6 @@ function openLinkedIn() {
     window.open('https://www.linkedin.com/feed/', '_blank');
 }
 
-// Show notification
-function showNotification(message, type = 'info') {
-    // Remove existing notification
-    const existingNotification = document.querySelector('.notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-        <span>${message}</span>
-    `;
-    
-    // Style the notification
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? '#d4edda' : '#d1ecf1'};
-        color: ${type === 'success' ? '#155724' : '#0c5460'};
-        border: 1px solid ${type === 'success' ? '#c3e6cb' : '#bee5eb'};
-        padding: 12px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-weight: 500;
-        animation: slideIn 0.3s ease-out;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Remove notification after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.style.animation = 'slideOut 0.3s ease-in';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }
-    }, 3000);
-}
-
-// Add CSS animations for notifications
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
-
 // Generate new post
 function generateNew() {
     hideResult();
@@ -315,6 +268,10 @@ function hideResult() {
 
 // Add some interactive features
 document.addEventListener('DOMContentLoaded', function() {
+    // Show environment info
+    console.log('Environment:', isLocal ? 'Local' : 'GitHub Pages');
+    console.log('API URL:', API_URL);
+    
     // Add focus effects to form inputs
     const inputs = document.querySelectorAll('input, select');
     inputs.forEach(input => {
@@ -399,36 +356,6 @@ function smoothScrollTo(element) {
         behavior: 'smooth',
         block: 'start'
     });
-}
-
-// Add loading animation for better user experience
-function addLoadingAnimation() {
-    const generateBtn = document.querySelector('.generate-btn');
-    const originalText = generateBtn.innerHTML;
-    
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-    generateBtn.disabled = true;
-    
-    return () => {
-        generateBtn.innerHTML = originalText;
-        generateBtn.disabled = false;
-    };
-}
-
-// Enhanced error handling with retry functionality
-function showErrorWithRetry(message) {
-    showError(message);
-    
-    const retryBtn = document.createElement('button');
-    retryBtn.textContent = 'Retry';
-    retryBtn.className = 'action-btn copy-btn';
-    retryBtn.style.marginTop = '10px';
-    retryBtn.onclick = () => {
-        hideError();
-        postForm.dispatchEvent(new Event('submit'));
-    };
-    
-    errorMessage.appendChild(retryBtn);
 }
 
 // Add character count for topic input
