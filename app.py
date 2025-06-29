@@ -5,6 +5,7 @@ import random
 import os
 from urllib.parse import urlparse
 import re
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -45,11 +46,11 @@ Context:
 - Industry: {industry}
 - Tone: {tone}
 - Topic: {topic}
-- Word Count: {word_count} words
+- Word Count: EXACTLY {word_count} words
 
 Requirements:
 - Make the content SPECIFIC to "{topic}" - don't be generic
-- Length: Approximately {word_count} words
+- Length: EXACTLY {word_count} words - count carefully
 - Include relevant emojis for visual appeal
 - Make it professional yet conversational
 - End with an engaging question related to {topic}
@@ -57,6 +58,8 @@ Requirements:
 - Add value and insights about {topic}
 - Make it shareable and thought-provoking
 - Include a call-to-action
+- Focus on SEO-optimized content with meaningful insights
+- Create high-quality, unique content every time
 
 Structure:
 1. Hook/Opening about {topic}
@@ -65,7 +68,7 @@ Structure:
 4. Engaging question for audience
 5. Relevant hashtags
 
-Generate a unique LinkedIn post:"""
+Generate a unique, high-quality LinkedIn post:"""
 
         try:
             response = requests.post(
@@ -74,12 +77,13 @@ Generate a unique LinkedIn post:"""
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry}. Create unique, specific, and engaging posts that provide real value to the audience. Each post should be different and tailored to the exact topic provided."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry}. Create unique, specific, and engaging posts that provide real value to the audience. Each post should be different and tailored to the exact topic provided. Focus on SEO-optimized content with meaningful insights. CRITICAL: Generate EXACTLY {word_count} words."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": word_count,
-                    "temperature": 0.8
-                }
+                    "max_tokens": 800,
+                    "temperature": 0.9
+                },
+                timeout=60  # Increased timeout for better quality
             )
             
             if response.status_code == 200:
@@ -87,66 +91,53 @@ Generate a unique LinkedIn post:"""
                 return result['choices'][0]['message']['content'].strip()
             else:
                 print(f"❌ Error: {response.status_code} - {response.text}")
-                return self._get_fallback_post(topic, industry, tone)
+                raise Exception(f"AI API Error: {response.status_code} - {response.text}")
                 
         except Exception as e:
             print(f"❌ Error: {e}")
-            return self._get_fallback_post(topic, industry, tone)
+            raise Exception(f"Failed to generate AI content: {str(e)}")
 
     def generate_post_from_article(self, url, industry=None, tone="professional", word_count=200):
-        """Generate LinkedIn post from article URL"""
+        """Generate a LinkedIn post from article content"""
         try:
-            # Extract domain name for cleaner references
-            try:
-                from urllib.parse import urlparse
-                parsed_url = urlparse(url)
-                domain = parsed_url.netloc.replace('www.', '')
-                source_name = domain.split('.')[0].title()  # Get first part of domain
-            except:
-                domain = "the article"
-                source_name = "the source"
+            # Extract article content
+            article_content = self.extract_article_content(url)
+            if not article_content:
+                raise Exception("Could not extract content from the article URL")
             
-            # Extract content from URL using a simple approach
-            # In production, you might want to use a more robust article extraction service
-            article_content = self._extract_article_content(url)
+            # Extract domain for source attribution
+            domain = self.extract_domain(url)
+            source_name = self.get_source_name(domain)
             
-            prompt = f"""Create a LinkedIn post that SUMMARIZES this specific news article from {source_name}.
+            prompt = f"""Create a unique, engaging LinkedIn post summarizing this article:
 
-Article content: {article_content[:2000]}...
+Article Content:
+{article_content}
 
-Context:
-- Industry: {industry or 'general'}
-- Tone: {tone}
-- Source: {source_name}
-- Word Count: EXACTLY {word_count} words (not more, not less)
+Source: {source_name}
 
 Requirements:
-- Create an ACTUAL SUMMARY of the article's main news points and key facts
-- Focus on the specific news content, facts, and important details from the article
-- Length: EXACTLY {word_count} words - count carefully
-- Include relevant emojis for visual appeal
-- Make it professional yet engaging
-- End with an engaging question related to the article's specific topic
-- Include 5-7 relevant hashtags specific to the article's subject matter
-- Reference specific details, numbers, or quotes from the article when possible
-- Make it clear this is a summary of the article's content
-- Don't be generic - focus on what the article actually says
-- Extract and highlight ONLY the most important news points from the article
-- Use the exact word count specified: {word_count} words
+- Industry: {industry or 'general'}
+- Tone: {tone}
+- Word Count: EXACTLY {word_count} words
+- Focus on the MOST IMPORTANT news and insights from the article
+- Include specific facts, numbers, and key details from the article
+- Make it SEO-optimized with meaningful content
+- Include relevant emojis
+- End with an engaging question
+- Add 5-7 relevant hashtags
+- Include a call-to-action
+- Create high-quality, unique content that provides real value
+- Make it shareable and thought-provoking
 
 Structure:
-1. Hook about the article's main news finding or key point
-2. Summary of the article's most important details and facts
-3. Why this matters to your audience
-4. Engaging question about the article's topic
+1. Hook with the most important news/finding
+2. Key insights and specific details from the article
+3. Industry implications or broader context
+4. Engaging question for audience
 5. Relevant hashtags
 
-Example format for news articles:
-"📰 [Article Title] from {source_name} reveals [key news finding]. The article reports [specific details from article]. This matters because [why it's important]. What's your take on [specific aspect from article]?
-
-#[relevant hashtags]"
-
-Generate a LinkedIn post that actually summarizes this news article in EXACTLY {word_count} words:"""
+Generate a unique, high-quality LinkedIn post summary:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -154,220 +145,122 @@ Generate a LinkedIn post that actually summarizes this news article in EXACTLY {
                 json={
                     "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                     "messages": [
-                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'} content. Your job is to create ACTUAL SUMMARIES of news articles that include specific details, facts, and insights from the article content. Focus on what the article actually says, not generic commentary. Always include specific information from the article in your summaries. CRITICAL: You must generate EXACTLY the number of words specified by the user - count carefully and do not exceed or fall short of the target word count."},
+                        {"role": "system", "content": f"You are a professional LinkedIn content creator specializing in {industry or 'general'}. Create unique, specific, and engaging posts that provide real value to the audience. Focus on SEO-optimized content with meaningful insights. CRITICAL: Generate EXACTLY {word_count} words."},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": word_count,
-                    "temperature": 0.8
-                }
+                    "max_tokens": 800,
+                    "temperature": 0.9
+                },
+                timeout=60  # Increased timeout for better quality
             )
             
             if response.status_code == 200:
                 result = response.json()
                 return result['choices'][0]['message']['content'].strip()
             else:
-                return self._get_fallback_post(f"article from {source_name}", industry, tone)
+                print(f"❌ Error: {response.status_code} - {response.text}")
+                raise Exception(f"AI API Error: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            print(f"❌ Error generating from article: {e}")
-            return self._get_fallback_post(f"article from {source_name}", industry, tone)
+            print(f"❌ Error: {e}")
+            raise Exception(f"Failed to generate AI content from article: {str(e)}")
 
-    def _extract_article_content(self, url):
-        """Enhanced article content extraction using BeautifulSoup"""
+    def extract_article_content(self, url):
+        """Extract content from article URL"""
         try:
-            # Try to import BeautifulSoup, fallback to simple extraction if it fails
-            try:
-                from bs4 import BeautifulSoup
-                use_beautifulsoup = True
-            except ImportError:
-                use_beautifulsoup = False
-                print("BeautifulSoup not available, using simple text extraction")
-            
-            # Set up headers to mimic a real browser
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
-            
-            response = requests.get(url, timeout=15, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
             
-            if use_beautifulsoup:
-                # Parse with BeautifulSoup
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # Remove script and style elements
-                for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
-                    script.decompose()
-                
-                # Extract title first
-                title = ""
-                title_selectors = ['h1', '.title', '.headline', '[class*="title"]', 'title']
-                for selector in title_selectors:
-                    title_elem = soup.select_one(selector)
-                    if title_elem:
-                        title = title_elem.get_text().strip()
-                        if title and len(title) > 10:
-                            break
-                
-                # Try to find main content using news-specific selectors
-                content_selectors = [
-                    'article',
-                    '[class*="content"]',
-                    '[class*="article"]',
-                    '[class*="post"]',
-                    '[class*="entry"]',
-                    '.post-content',
-                    '.article-content',
-                    '.entry-content',
-                    '.content-body',
-                    '.story-body',
-                    '.article-body',
-                    '.news-content',
-                    '.story-content',
-                    'main',
-                    '.main-content',
-                    '#content',
-                    '.content',
-                    '.text-content'
-                ]
-                
-                content = ""
-                
-                # Try to find main content
-                for selector in content_selectors:
-                    elements = soup.select(selector)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            # Try to find main content areas
+            content_selectors = [
+                'article',
+                '[class*="content"]',
+                '[class*="article"]',
+                '[class*="post"]',
+                '[class*="story"]',
+                'main',
+                '.entry-content',
+                '.post-content',
+                '.article-content',
+                '.story-content'
+            ]
+            
+            content = ""
+            for selector in content_selectors:
+                elements = soup.select(selector)
+                if elements:
                     for element in elements:
                         text = element.get_text(separator=' ', strip=True)
-                        if len(text) > 300:  # Only consider substantial content
-                            content = text
-                            break
-                    if content:
-                        break
-                
-                # If no specific content found, try to get body text
-                if not content:
-                    body = soup.find('body')
-                    if body:
-                        # Remove navigation, ads, and other non-content elements
-                        for elem in body.find_all(['nav', 'header', 'footer', 'aside', 'script', 'style']):
-                            elem.decompose()
-                        content = body.get_text(separator=' ', strip=True)
-            else:
-                # Fallback to simple text extraction
-                content = re.sub(r'<[^>]+>', '', response.text)
-                title = ""
+                        if len(text) > 200:  # Only use substantial content
+                            content += text + " "
+            
+            # If no specific content areas found, get all text
+            if not content.strip():
+                content = soup.get_text(separator=' ', strip=True)
             
             # Clean up the content
-            if content:
-                # Remove extra whitespace
-                content = re.sub(r'\s+', ' ', content)
-                # Remove common unwanted text
-                content = re.sub(r'(cookie|privacy|terms|subscribe|newsletter|advertisement|ads|sign in|sign up|login|register)', '', content, flags=re.IGNORECASE)
-                
-                # Extract important news sentences (those with key words or numbers)
-                sentences = content.split('.')
-                important_sentences = []
-                
-                # Keywords that indicate important news content
-                news_keywords = [
-                    # Action words
-                    'announced', 'launched', 'released', 'introduced', 'developed', 'created',
-                    'reported', 'found', 'discovered', 'revealed', 'showed', 'indicated',
-                    'arrested', 'charged', 'accused', 'investigated', 'probed', 'questioned',
-                    'filed', 'submitted', 'complained', 'alleged', 'claimed', 'stated',
-                    
-                    # Numbers and data
-                    'million', 'billion', 'percent', '%', 'dollars', '$', 'users', 'customers',
-                    'people', 'students', 'victims', 'suspects', 'accused', 'witnesses',
-                    
-                    # News-specific terms
-                    'police', 'investigation', 'case', 'incident', 'crime', 'victim',
-                    'survivor', 'accused', 'suspect', 'arrest', 'charge', 'trial',
-                    'court', 'judge', 'lawyer', 'advocate', 'prosecution', 'defense',
-                    'evidence', 'witness', 'testimony', 'statement', 'complaint',
-                    
-                    # Location and time
-                    'kolkata', 'delhi', 'mumbai', 'bangalore', 'chennai', 'hyderabad',
-                    'india', 'state', 'city', 'district', 'area', 'location',
-                    'yesterday', 'today', 'morning', 'evening', 'night', 'week',
-                    'month', 'year', 'date', 'time', 'period',
-                    
-                    # Educational/Institutional terms
-                    'college', 'university', 'school', 'institution', 'authority',
-                    'administration', 'faculty', 'staff', 'student', 'teacher',
-                    'principal', 'director', 'head', 'official', 'committee',
-                    
-                    # General important terms
-                    'technology', 'innovation', 'startup', 'company', 'business', 'market',
-                    'research', 'study', 'survey', 'analysis', 'data', 'results', 'findings'
-                ]
-                
-                for sentence in sentences:
-                    sentence = sentence.strip()
-                    if len(sentence) > 25:  # Only consider substantial sentences
-                        # Check if sentence contains important keywords or numbers
-                        has_keywords = any(keyword.lower() in sentence.lower() for keyword in news_keywords)
-                        has_numbers = bool(re.search(r'\d+', sentence))
-                        has_quotes = '"' in sentence or "'" in sentence  # Quotes often contain important info
-                        
-                        if has_keywords or has_numbers or has_quotes:
-                            important_sentences.append(sentence)
-                
-                # If we found important sentences, use them; otherwise use the original content
-                if important_sentences:
-                    content = '. '.join(important_sentences[:15])  # Limit to 15 most important sentences
-                else:
-                    # Fallback: use first few sentences that seem substantial
-                    content = '. '.join([s.strip() for s in sentences[:10] if len(s.strip()) > 30])
-                
-                # Limit length
-                content = content[:4000]  # Increased limit for better content
-                
-                # Combine title and content
-                if title:
-                    full_content = f"Title: {title}\n\nContent: {content}"
-                else:
-                    full_content = content
-                
-                return full_content
-            else:
-                return f"Article content could not be extracted from {url}. Please check the URL and try again."
-                
+            content = re.sub(r'\s+', ' ', content)
+            content = re.sub(r'[^\w\s\.\,\!\?\:\;\-\(\)]', '', content)
+            
+            # Limit content length for API
+            if len(content) > 3000:
+                content = content[:3000] + "..."
+            
+            return content.strip()
+            
         except Exception as e:
-            print(f"Error extracting content from {url}: {e}")
-            return f"Unable to extract content from {url}. Error: {str(e)}"
+            print(f"❌ Error extracting article content: {e}")
+            return None
+
+    def extract_domain(self, url):
+        """Extract domain from URL"""
+        try:
+            parsed = urlparse(url)
+            return parsed.netloc
+        except:
+            return "unknown"
+
+    def get_source_name(self, domain):
+        """Get readable source name from domain"""
+        domain_mapping = {
+            'techcrunch.com': 'TechCrunch',
+            'wired.com': 'Wired',
+            'theverge.com': 'The Verge',
+            'arstechnica.com': 'Ars Technica',
+            'cnn.com': 'CNN',
+            'bbc.com': 'BBC',
+            'reuters.com': 'Reuters',
+            'bloomberg.com': 'Bloomberg',
+            'forbes.com': 'Forbes',
+            'hbr.org': 'Harvard Business Review',
+            'medium.com': 'Medium',
+            'substack.com': 'Substack',
+            'github.com': 'GitHub',
+            'stackoverflow.com': 'Stack Overflow',
+            'dev.to': 'DEV Community'
+        }
+        
+        for key, value in domain_mapping.items():
+            if key in domain.lower():
+                return value
+        
+        # Extract from domain if not in mapping
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        return domain.split('.')[0].title()
 
     def _get_fallback_post(self, topic, industry, tone):
-        """Fallback post if AI fails"""
-        # Create more specific fallback posts based on the actual topic
-        topic_clean = topic.replace('"', '').strip()
-        industry_clean = industry.replace('"', '').strip()
-        
-        # Extract domain name if topic contains a URL
-        if topic_clean.startswith('http'):
-            try:
-                from urllib.parse import urlparse
-                parsed_url = urlparse(topic_clean)
-                domain = parsed_url.netloc.replace('www.', '')
-                topic_clean = f"article from {domain}"
-            except:
-                topic_clean = "this article"
-        
-        fallback_posts = [
-            f"📰 Interesting article from {topic_clean}! The piece covers important developments in {industry_clean} that could impact how we approach our work. What specific insights from this article resonate with your experience?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
-            
-            f"🔍 Just read a compelling piece from {topic_clean} about {industry_clean} trends. The article highlights key points that professionals in our field should consider. Which aspects of this coverage stand out to you?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
-            
-            f"📊 {topic_clean} published an insightful article on {industry_clean} developments. The coverage provides valuable perspectives that could influence our industry approach. What's your reaction to the main points discussed?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing",
-            
-            f"💡 Worthwhile read from {topic_clean} on {industry_clean} topics. The article presents important information that professionals should be aware of. How do you see these insights applying to your work?\n\n#{industry_clean.replace(' ', '')} #{topic_clean.replace(' ', '').replace('articlefrom', '')} #ProfessionalGrowth #Innovation #DigitalMarketing"
-        ]
-        return random.choice(fallback_posts)
+        """Get a fallback post template - REMOVED: Now always uses AI"""
+        pass
 
 # Initialize AI Generator
 ai_generator = AIGenerator(OPENROUTER_API_KEY)
