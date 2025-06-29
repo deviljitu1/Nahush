@@ -12,18 +12,20 @@ app = Flask(__name__)
 # Configuration
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCR2qkH4DXw4jBXbT94YnAOgwaSD6r-rBI')
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
 
 class AIGenerator:
-    def __init__(self, api_key):
-        self.api_key = api_key
+    def __init__(self, openrouter_api_key, gemini_api_key):
+        self.openrouter_api_key = openrouter_api_key
+        self.gemini_api_key = gemini_api_key
         self.headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://openrouter.ai/"
+            'Authorization': f'Bearer {self.openrouter_api_key}',
+            'Content-Type': 'application/json'
         }
 
     def generate_linkedin_post(self, topic=None, industry=None, tone="professional", word_count=200):
-        """Generate a LinkedIn post using AI"""
+        """Generate a LinkedIn post using AI, fallback to Gemini if OpenRouter fails"""
         if not topic:
             topics = [
                 "latest project completion",
@@ -40,35 +42,7 @@ class AIGenerator:
         if not industry:
             industry = "technology and digital marketing"
 
-        prompt = f"""Create a unique, engaging LinkedIn post about: {topic}
-
-Context:
-- Industry: {industry}
-- Tone: {tone}
-- Topic: {topic}
-- Word Count: EXACTLY {word_count} words
-
-Requirements:
-- Make the content SPECIFIC to "{topic}" - don't be generic
-- Length: EXACTLY {word_count} words - count carefully
-- Include relevant emojis for visual appeal
-- Make it professional yet conversational
-- End with an engaging question related to {topic}
-- Include 5-7 relevant hashtags specific to {topic}
-- Add value and insights about {topic}
-- Make it shareable and thought-provoking
-- Include a call-to-action
-- Focus on SEO-optimized content with meaningful insights
-- Create high-quality, unique content every time
-
-Structure:
-1. Hook/Opening about {topic}
-2. Key insights or value about {topic}
-3. Personal perspective or industry context
-4. Engaging question for audience
-5. Relevant hashtags
-
-Generate a unique, high-quality LinkedIn post:"""
+        prompt = f"""Create a unique, engaging LinkedIn post about: {topic}\n\nContext:\n- Industry: {industry}\n- Tone: {tone}\n- Topic: {topic}\n- Word Count: EXACTLY {word_count} words\n\nRequirements:\n- Make the content SPECIFIC to \"{topic}\" - don't be generic\n- Length: EXACTLY {word_count} words - count carefully\n- Include relevant emojis for visual appeal\n- Make it professional yet conversational\n- End with an engaging question related to {topic}\n- Include 5-7 relevant hashtags specific to {topic}\n- Add value and insights about {topic}\n- Make it shareable and thought-provoking\n- Include a call-to-action\n- Focus on SEO-optimized content with meaningful insights\n- Create high-quality, unique content every time\n\nStructure:\n1. Hook/Opening about {topic}\n2. Key insights or value about {topic}\n3. Personal perspective or industry context\n4. Engaging question for audience\n5. Relevant hashtags\n\nGenerate a unique, high-quality LinkedIn post:"""
 
         try:
             response = requests.post(
@@ -83,61 +57,30 @@ Generate a unique, high-quality LinkedIn post:"""
                     "max_tokens": 800,
                     "temperature": 0.9
                 },
-                timeout=60  # Increased timeout for better quality
+                timeout=60
             )
             
             if response.status_code == 200:
                 result = response.json()
                 return result['choices'][0]['message']['content'].strip()
             else:
-                print(f"❌ Error: {response.status_code} - {response.text}")
                 raise Exception(f"AI API Error: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            print(f"❌ Error: {e}")
-            raise Exception(f"Failed to generate AI content: {str(e)}")
+            print(f"OpenRouter failed, falling back to Gemini: {e}")
+            return self.generate_with_gemini(prompt, word_count)
 
     def generate_post_from_article(self, url, industry=None, tone="professional", word_count=200):
-        """Generate a LinkedIn post from article content"""
+        """Generate a LinkedIn post from article content, fallback to Gemini if OpenRouter fails"""
         try:
-            # Extract article content
             article_content = self.extract_article_content(url)
             if not article_content:
                 raise Exception("Could not extract content from the article URL")
             
-            # Extract domain for source attribution
             domain = self.extract_domain(url)
             source_name = self.get_source_name(domain)
             
-            prompt = f"""Create a unique, engaging LinkedIn post summarizing this article:
-
-Article Content:
-{article_content}
-
-Source: {source_name}
-
-Requirements:
-- Industry: {industry or 'general'}
-- Tone: {tone}
-- Word Count: EXACTLY {word_count} words
-- Focus on the MOST IMPORTANT news and insights from the article
-- Include specific facts, numbers, and key details from the article
-- Make it SEO-optimized with meaningful content
-- Include relevant emojis
-- End with an engaging question
-- Add 5-7 relevant hashtags
-- Include a call-to-action
-- Create high-quality, unique content that provides real value
-- Make it shareable and thought-provoking
-
-Structure:
-1. Hook with the most important news/finding
-2. Key insights and specific details from the article
-3. Industry implications or broader context
-4. Engaging question for audience
-5. Relevant hashtags
-
-Generate a unique, high-quality LinkedIn post summary:"""
+            prompt = f"""Create a unique, engaging LinkedIn post summarizing this article:\n\nArticle Content:\n{article_content}\n\nSource: {source_name}\n\nRequirements:\n- Industry: {industry or 'general'}\n- Tone: {tone}\n- Word Count: EXACTLY {word_count} words\n- Focus on the MOST IMPORTANT news and insights from the article\n- Include specific facts, numbers, and key details from the article\n- Make it SEO-optimized with meaningful content\n- Include relevant emojis\n- End with an engaging question\n- Add 5-7 relevant hashtags\n- Include a call-to-action\n- Create high-quality, unique content that provides real value\n- Make it shareable and thought-provoking\n\nStructure:\n1. Hook with the most important news/finding\n2. Key insights and specific details from the article\n3. Industry implications or broader context\n4. Engaging question for audience\n5. Relevant hashtags\n\nGenerate a unique, high-quality LinkedIn post summary:"""
 
             response = requests.post(
                 OPENROUTER_BASE_URL,
@@ -151,19 +94,18 @@ Generate a unique, high-quality LinkedIn post summary:"""
                     "max_tokens": 800,
                     "temperature": 0.9
                 },
-                timeout=60  # Increased timeout for better quality
+                timeout=60
             )
             
             if response.status_code == 200:
                 result = response.json()
                 return result['choices'][0]['message']['content'].strip()
             else:
-                print(f"❌ Error: {response.status_code} - {response.text}")
                 raise Exception(f"AI API Error: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            print(f"❌ Error: {e}")
-            raise Exception(f"Failed to generate AI content from article: {str(e)}")
+            print(f"OpenRouter failed, falling back to Gemini: {e}")
+            return self.generate_with_gemini(prompt, word_count)
 
     def extract_article_content(self, url):
         """Extract content from article URL"""
@@ -258,12 +200,38 @@ Generate a unique, high-quality LinkedIn post summary:"""
             domain = domain[4:]
         return domain.split('.')[0].title()
 
-    def _get_fallback_post(self, topic, industry, tone):
-        """Get a fallback post template - REMOVED: Now always uses AI"""
-        pass
+    def generate_with_gemini(self, prompt, word_count):
+        """Generate content using Gemini AI"""
+        try:
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "maxOutputTokens": min(word_count * 2, 1024),
+                    "temperature": 0.9
+                }
+            }
+            response = requests.post(
+                f"{GEMINI_API_URL}?key={self.gemini_api_key}",
+                headers=headers,
+                json=data,
+                timeout=60
+            )
+            if response.status_code == 200:
+                result = response.json()
+                # Gemini's response structure
+                return result['candidates'][0]['content']['parts'][0]['text'].strip()
+            else:
+                print(f"Gemini API Error: {response.status_code} - {response.text}")
+                return "[AI Error: Unable to generate content from both OpenRouter and Gemini]"
+        except Exception as e:
+            print(f"Gemini fallback failed: {e}")
+            return "[AI Error: Unable to generate content from both OpenRouter and Gemini]"
 
 # Initialize AI Generator
-ai_generator = AIGenerator(OPENROUTER_API_KEY)
+ai_generator = AIGenerator(OPENROUTER_API_KEY, GEMINI_API_KEY)
 
 @app.route('/')
 def index():
