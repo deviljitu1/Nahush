@@ -1,5 +1,5 @@
 // API Configuration - API calls will be made through the backend
-const API_URL = '/generate';
+const API_URL = 'https://linkedin-post-generator-ejfk.onrender.com/generate';
 
 // DOM Elements
 const postForm = document.getElementById('postForm');
